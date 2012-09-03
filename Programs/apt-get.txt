@@ -1,18 +1,20 @@
 local tArgs = { ... }
 function pkg(pkg)
-  url = "https://raw.github.com/Human-/CC_Files/Programs" ..pkg
+  url = "https://raw.https://github.com/Human-/CC_Files/blob/master/Programs/boomhttps://github.com/Human-/CC_Files/blob/master/Programs/" ..pkg
   if http.get(url) then
     fs.makeDir("/temp")
     fs.delete("/temp/" ..pkg)
-    f = io.open(pkg, "w")
+    f = fs.open(pkg, "w")
     f:write(http.get(url).readAll())
     f:close()
+  else
+    print("Download Failed!")  
   end
 end
 local function printUsage()
   print("Correct Usage: apt-get <package>")
 end
-if #tArgs == < 1 then
+if #tArgs < 1 then
   printUsage()
 else
   pkg(tArgs[1])
