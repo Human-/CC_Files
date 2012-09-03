@@ -1,12 +1,15 @@
 local tArgs = { ... }
 function pkg(pkg)
-  url = "https://raw.github.com/Human-/CC_Files/Programs" ..pkg
-  if http.get(url) then
+  url = "https://raw.github.com/Human-/CC_Files/master/Programs/" ..pkg
+  x=http.get(url)
+  if x then
     fs.makeDir("/temp")
     fs.delete("/temp/" ..pkg)
-    f = io.open(pkg, "w")
-    f:write(http.get(url).readAll())
-    f:close()
+    f = fs.open(pkg, "w")
+    f.write(http.get(url).readAll())
+    f.close()
+  else
+    print("Download failed!")
   end
 end
 local function printUsage()
