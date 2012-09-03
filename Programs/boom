@@ -1,0 +1,23 @@
+--Commands
+help = "/help"
+quit = "/quit"
+boom = "boom"
+--Main Program
+input = read()
+if input == quit then
+  term.clear()
+  term.setCursorPos(1,1)
+elseif
+  input == help then
+    print("Commands:")
+    print("/help Displays help")
+    print("/quit Quits the porgram")
+    print("/boom It goes BOOM!")
+       
+  elseif
+    input == boom then
+      rednet.broadcast("boom")
+    else
+      print("Type /help for help")
+    end
+ 
