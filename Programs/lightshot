@@ -1,0 +1,436 @@
+if recordingData == nil then
+lightshotTerm = term
+lightshotPrint = print
+lightshotWrite = write
+recordingData = nil
+term = {}
+lightshotClock = 0
+end
+
+lightshotRecording = false
+recordStart = [[term.clear(); term.setCursorPos(1, 1); print("This was recorded using Mozilla Lightshot"); sleep(2);
+term.clear(); term.setCursorPos(1,1); ]]
+
+print = function(textData)
+	textData = tostring(textData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+if textData == nil then textData = "" end
+		writeData = string.gsub(textData, "\n", "\\n")
+		writeData = string.gsub(writeData, "\"", "\\\"")
+		writeData = string.gsub(writeData, "\\", "\\\\")
+		recordingData = (recordingData .. writeClock .. "print(\"" .. writeData .. "\");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotPrint(textData)
+end
+
+write = function(textData)
+	textData = tostring(textData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+if textData == nil then textData = "" end
+		writeData = string.gsub(textData, "\n", "\\n")
+		writeData = string.gsub(writeData, "\"", "\\\"")
+		writeData = string.gsub(writeData, "\\", "\\\\")
+		recordingData = (recordingData .. writeClock .. "write(\"" .. writeData .. "\");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotWrite(textData)
+end
+
+term.write = function(textData)
+	textData = tostring(textData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+	if textData == nil then textData = "" end
+		writeData = string.gsub(textData, "\n", "\\n")
+		writeData = string.gsub(writeData, "\"", "\\\"")
+		writeData = string.gsub(writeData, "\\", "\\\\")
+		recordingData = (recordingData .. writeClock .. "term.write(\"" .. writeData .. "\");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.write(textData)
+end
+
+term.clear = function()
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.clear();\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.clear()
+end
+
+term.clearLine = function()
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.clearLine();\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.clearLine()
+end
+
+term.setCursorPos = function(xData, yData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.setCursorPos(" .. xData .. "," .. yData .. ");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.setCursorPos(xData, yData)
+end
+
+term.setCursorBlink = function(bTF)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.setCursorBlink(" .. tostring(bTF) .. ");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.setCursorBlink(bTF)
+end
+
+term.getSize = function()
+		return lightshotTerm.getSize()
+end
+
+term.getCursorPos = function()
+		return lightshotTerm.getCursorPos()
+end
+
+term.scroll = function(scrollData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.scroll(" .. scrollData .. ");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.scroll(scrollData)
+end
+
+term.redirect = function(dirData)
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.redirect(" .. dirData .. ");\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.redirect(dirData)
+end
+
+term.restore = function()
+	local writeClock = ""
+	if lightshotRecording then
+	if (os.clock() - lightshotClock) > 0 then
+		writeClock = ("sleep(" .. tostring(os.clock() - lightshotClock) .. ");\n")
+	end
+		recordingData = (recordingData .. writeClock .. "term.restore();\n")
+		lightshotClock = os.clock()
+	end
+		return lightshotTerm.restore()
+end
+
+read = nil
+
+read = function( _sReplaceChar, _tHistory )	
+	term.setCursorBlink( true )
+
+    local sLine = ""
+	local nHistoryPos = nil
+	local nPos = 0
+    if _sReplaceChar then
+		_sReplaceChar = string.sub( _sReplaceChar, 1, 1 )
+	end
+	
+	local w, h = term.getSize()
+	local sx, sy = term.getCursorPos()	
+	local function redraw()
+		local nScroll = 0
+		if sx + nPos >= w then
+			nScroll = (sx + nPos) - w
+		end
+			
+		term.setCursorPos( sx, sy )
+		term.write( string.rep(" ", w - sx + 1) )
+		term.setCursorPos( sx, sy )
+		if _sReplaceChar then
+			term.write( string.rep(_sReplaceChar, string.len(sLine) - nScroll) )
+		else
+			term.write( string.sub( sLine, nScroll + 1 ) )
+		end
+		term.setCursorPos( sx + nPos - nScroll, sy )
+	end
+	
+	while true do
+		local sEvent, param = os.pullEvent()
+		if sEvent == "char" then
+			sLine = string.sub( sLine, 1, nPos ) .. param .. string.sub( sLine, nPos + 1 )
+			nPos = nPos + 1
+			redraw()
+			
+		elseif sEvent == "key" then
+		    if param == keys.enter then
+				-- Enter
+				break
+				
+			elseif param == keys.left then
+				-- Left
+				if nPos > 0 then
+					nPos = nPos - 1
+					redraw()
+				end
+				
+			elseif param == keys.right then
+				-- Right				
+				if nPos < string.len(sLine) then
+					nPos = nPos + 1
+					redraw()
+				end
+			
+			elseif param == keys.up or param == keys.down then
+                -- Up or down
+				if _tHistory then
+					if param == keys.up then
+						-- Up
+						if nHistoryPos == nil then
+							if #_tHistory > 0 then
+								nHistoryPos = #_tHistory
+							end
+						elseif nHistoryPos > 1 then
+							nHistoryPos = nHistoryPos - 1
+						end
+					else
+						-- Down
+						if nHistoryPos == #_tHistory then
+							nHistoryPos = nil
+						elseif nHistoryPos ~= nil then
+							nHistoryPos = nHistoryPos + 1
+						end						
+					end
+					
+					if nHistoryPos then
+                    	sLine = _tHistory[nHistoryPos]
+                    	nPos = string.len( sLine ) 
+                    else
+						sLine = ""
+						nPos = 0
+					end
+					redraw()
+                end
+			elseif param == keys.backspace then
+				-- Backspace
+				if nPos > 0 then
+					sLine = string.sub( sLine, 1, nPos - 1 ) .. string.sub( sLine, nPos + 1 )
+					nPos = nPos - 1					
+					redraw()
+				end
+			end
+		end
+	end
+	
+	term.setCursorBlink( false )
+	term.setCursorPos( w + 1, sy )
+	print()
+	
+	return sLine
+end
+
+local function cPrint(text)
+	local w, h = term.getSize()
+	local x, y = term.getCursorPos()
+	term.setCursorPos(math.ceil((w / 2) - (text:len() / 2)), y)
+	print(text)
+end
+
+
+local function cPrint(text)
+	local w, h = term.getSize()
+	local x, y = term.getCursorPos()
+	term.setCursorPos(math.ceil((w / 2) - (text:len() / 2)), y)
+	print(text)
+end
+
+
+local function prompt(list, dir)
+	--Variables
+	local curSel = 1
+	local c1 = 200
+	local c2 = 208
+	if dir == "horizontal" then c1 = 203 c2 = 205 end
+	
+	--Draw words
+	for i = 1, #list do
+		if list[i][2] == 1 then list[i][2] = 2
+		elseif list[i][2] + string.len(list[i][1]) >= 50 then 
+			list[i][2] = 49 - string.len(list[i][1]) 
+		end
+		
+		term.setCursorPos(list[i][2], list[i][3])
+		write(list[i][1])
+	end
+	
+	--Functions
+	local function drawArrows(word, x, y)
+		--Draw arrows
+		term.setCursorPos(x, y)
+		write("[")
+		term.setCursorPos(x + 1 + string.len(word), y)
+		write("]")
+	end
+	
+	local function removeArrows(word, x, y)
+		--Remove current arrows
+		term.setCursorPos(x, y)
+		write(" ")
+		term.setCursorPos(x + 1 + string.len(word), y)
+		write(" ")
+	end
+	
+	--Draw arrows
+	drawArrows(list[curSel][1], list[curSel][2] - 1, list[curSel][3])
+	
+	--Start loop
+	while true do
+		--Get the key
+		local event, key = os.pullEvent("key")
+		
+		--Remove arrows
+		removeArrows(list[curSel][1], list[curSel][2] - 1, list[curSel][3])
+		
+		if key == c1 then
+			--Subtract
+			if curSel ~= 1 then
+				curSel = curSel - 1
+			end
+		elseif key == c2 then
+			--Add
+			if curSel ~= #list then
+				curSel = curSel + 1
+			end
+		elseif key == 28 then
+			--Enter
+			return list[curSel][1]
+		end
+		
+		--Draw Arrows
+		drawArrows(list[curSel][1], list[curSel][2] - 1, list[curSel][3])
+	end
+end
+
+local function isBlank(blankText)
+	if blankText == "" or blankText == " " then
+		return true
+	else
+		for bTextLoop = 1, blankText:len() do
+			if not (blankText:sub(bTextLoop, bTextLoop) == " ") then
+				return false
+			end
+		end
+	return true
+	end
+end
+
+local function startRecording(recordingLocation)
+	lightshotRecording = true
+	while true do
+		local event = nil
+		local key = nil
+		event, key = os.pullEvent("key")
+		if key == 59 then
+			f = io.open(recordingLocation, "w")
+			f:write(recordingData .. tostring("sleep(" .. os.clock() - lightshotClock .. "); term.clear(); term.setCursorPos(1,1); print(\"End of recording\"); --END--\n "))
+			f:close()
+			lightshotRecording = false
+			lightshotClock = nil
+			recordTable = ""
+			term.clear()
+			term.setCursorPos(1,1)
+			print("Recording saved!")
+			error()
+			break
+		end
+	end
+end
+
+local function virtualShell()
+	print(os.version())
+	while true do
+		write("> ")
+		local runProgram = read()
+		shell.run(runProgram)
+	end
+end
+
+
+term.clear()
+term.setCursorPos(1,1)
+cPrint("___  ___             _  _  _        ")
+cPrint("|  \\/  |            (_)| || |       ")
+cPrint("| .  . |  ___   ____ _ | || |  __ _ ")
+cPrint("| |\\/| | / _ \\ |_  /| || || | / _` |")
+cPrint("| |  | || (_) | / / | || || || (_| |")
+cPrint("\\_|  |_/ \\___/ /___||_||_||_| \\__,_|")
+cPrint("                                    ")
+cPrint("Mozilla Lightshot")
+cPrint("Setup a new recording?")
+if prompt({{"Yes", 11, 12}, {"No", 36, 12}}, "horizontal") == "Yes" then
+	term.clear()
+	term.setCursorPos(2,3)
+	write("Record as: ")
+	recordingLocation = read()
+	if recordingLocation == nil then
+		term.clear()
+		term.setCursorPos(1,1)
+		error("Recording location cannot be nil")
+	elseif isBlank(recordingLocation) then
+		term.clear()
+		term.setCursorPos(1,1)
+		error("Recording location cannot be blank")
+	end
+	term.clear()
+	term.setCursorPos(1,5)
+	cPrint("The recording will be saved to")
+	cPrint("/" .. recordingLocation)
+	cPrint("The recording will start when you hit OK")
+	cPrint("Pressing F1 will stop and save the recording")
+	cPrint("The screen will clear and everything will")
+	cPrint("exit when the recording has finished")
+	cPrint("Your program must not override the term function")
+	cPrint("You will return to shell when you hit OK")
+	prompt({{"OK", 25,15}}, "horizontal")
+	term.clear()
+	term.setCursorPos(1,1)
+	recordingData = recordStart
+	lightshotClock = os.clock()
+	parallel.waitForAny(function() startRecording(recordingLocation) end, virtualShell)
+
+else
+	sleep(0.1)
+	term.clear()
+	term.setCursorPos(1,1)
+	print("Thank you for using Lightshot")
+end
