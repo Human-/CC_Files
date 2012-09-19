@@ -1,0 +1,662 @@
+-- Variables --
+ScreenWidth, ScreenHeight = term.getSize(); -- Screen dimensions.
+Selection = 2; -- Offset the selectio to 2 because then it will start on the "connect" option.
+MenuState = "Main"; -- This is the current menu that the program is in.
+
+ServerID = 0; -- The server computer that we are remotely connected to.
+Connected = false; -- The state of our connection. If the variable is nil then assume that we are hosting.
+CurrentDirectory = ""; -- The current directory of the user on the remote computer.
+
+Lines = 0; -- The amount of lines typed on the modified shell. This way, we can clear the screen if too many lines execute.
+tCommandHistory = {}; -- A list of all of the commands executed since the connection began.
+tFileList = {} -- A list of all current files in the directory.
+
+tMainMenu = { [1] = { Title = "Exit" }, [2] = { Title = "Connect" }, [3] = { Title = "Host" } }; -- This table holds the options on the main menu.
+
+bRunning = true; -- Whether or not the program is running.
+VERSION = 1.5;
+----------------
+
+
+-- Helping functions --
+function rPrint(height, string)
+	term.setCursorPos( ScreenWidth - string.len( string ), height );
+	term.write( string );
+end
+
+function cPrint( height, string )
+	term.setCursorPos( ScreenWidth/2 - string.len( string )/2, height );
+	term.write( string );
+end
+
+function Clear()
+	term.clear();
+	term.setCursorPos( 1, 1 );
+end
+
+-- Code taken directly from: http://lua-users.org/wiki/SplitJoin
+-- Compatibility: Lua-5.1
+function split(str, pat)
+   local t = {}  -- NOTE: use {n = 0} in Lua-5.0
+   local fpat = "(.-)" .. pat
+   local last_end = 1
+   local s, e, cap = str:find(fpat, 1)
+   while s do
+      if s ~= 1 or cap ~= "" then
+	 table.insert(t,cap)
+      end
+      last_end = e+1
+      s, e, cap = str:find(fpat, last_end)
+   end
+   if last_end <= #str then
+      cap = str:sub(last_end)
+      table.insert(t, cap)
+   end
+   return t
+end
+
+function SplitFileList( FileList, bPrint ) -- Splits the list into usable tables and prints the list out.
+	local tObjects = split( FileList, "!SP!" );
+	local tDirs = {};
+	local tFiles = {};
+	
+	bPrint = bPrint or false
+	
+	for i=1, #tObjects do
+		if tObjects[i+1] == "D" then -- If the object is a directory.
+			table.insert( tDirs, tObjects[i] ); -- Add the object to the directories table.
+			table.remove( tObjects, i+1 );
+		else -- If the object is a file.
+			table.insert( tFiles, tObjects[i] ); -- Add the object to the files table.
+			table.remove( tObjects, i+1 );
+		end
+	end
+	table.sort( tDirs );
+	table.sort( tFiles );
+	
+	tFileList = tFiles
+	
+	if bPrint then
+		textutils.pagedTabulate( tDirs, tFiles );
+	end
+end
+
+function BackupDirectory( Directory ) -- Seperates the directory given into one less level.
+	local tDirLevels = split( Directory, "/" ); -- Seperate each level of directories into a table.
+	table.remove( tDirLevels, #tDirLevels ); -- Remove the last directory.
+	
+	local NewDir = ""; -- Holds the new shortened directory.
+	for i,v in pairs( tDirLevels ) do
+		NewDir = NewDir .. "/" .. v;
+	end
+	
+	return string.sub( NewDir, 2, string.len( NewDir ) );
+end
+-----------------------
+
+-- Update functions --
+function update( nNewVer )
+	local sCode = "RBqVtp5r"
+	
+	file = fs.open(".serverVersion", "w")
+	file.write(nNewVer)
+	file.close()
+	
+	Clear();
+	DrawLogo();
+	cPrint( 11, "Updating..." );
+		
+	while true do
+		local response = http.get(
+			"http://pastebin.com/raw.php?i="..textutils.urlEncode( sCode )
+			)
+				
+		if response then
+			local sResponse = response.readAll()
+			response.close()
+				
+			file = fs.open("/MozillaRemoteConnect", "w")
+			file.write(sResponse)
+			file.close()
+			return
+		else return end
+	end
+end
+
+function checkForUpdate()
+	local sCode = "TxctrqXC"
+		
+	Clear();
+	DrawLogo();
+	cPrint( 11, "Checking version..." );
+		
+	while true do
+		local response = http.get(
+			"http://pastebin.com/raw.php?i="..textutils.urlEncode( sCode )
+			)
+				
+		if response then
+			local sResponse = response.readAll()
+			response.close()
+				
+			if VERSION < tonumber(sResponse) then return tonumber(sResponse), true
+			else return false end
+		else return false end
+	end
+end
+----------------------
+
+-- Gui functions --
+function DrawLogo() -- Draws the Mozilla logo to the screen.
+	cPrint( 4, "    __  ___            _ ____     " );
+	cPrint( 5, "   /  |/  /___  ____  (_) / /___ _" );
+	cPrint( 6, "  / /|_/ / __ \\/_  / / / / / __ '/" );
+	cPrint( 7, " / /  / / /_/ / / /_/ / / / /_/ / " );
+	cPrint( 8, "/_/  /_/\\____/ /___/_/_/_/\\__,_/  " );
+	cPrint( 10, "Remote Connect by PaymentOption" );
+end
+
+function DrawMainMenu() -- Draw the selections available to you when you open the program.
+	if Selection == 2 then -- If the selection is equal to the first option in the main menu, connect.
+		term.setCursorPos( 16, 14 ); -- Connect
+		term.write( "[" .. tMainMenu[Selection].Title .. "]" );
+		
+		term.setCursorPos( 26, 14 ); -- Host
+		term.write( " " .. tMainMenu[3].Title .. " " );
+		
+		term.setCursorPos(1, 18); -- Exit
+		term.write( " " .. tMainMenu[1].Title .. " " );
+		
+		-- Write the description of the option.
+		cPrint( 16, "Connect remotely to another computer" );
+		cPrint( 17, "that is running the modified shell." );
+	elseif Selection == 3 then -- If the selection is equal to the third option in the menu, host.
+		term.setCursorPos( 16, 14 ); -- Connect
+		term.write( " " .. tMainMenu[2].Title .. " " );
+		
+		term.setCursorPos( 26, 14 ); -- Host
+		term.write( "[" .. tMainMenu[Selection].Title .. "]" );
+		
+		term.setCursorPos(1, 18); -- Exit
+		term.write( " " .. tMainMenu[1].Title .. " " );
+		
+		-- Write the description of the option.
+		cPrint( 16, "Launch the Mozilla hosting program to" );
+		cPrint( 17, "allow remote access of this computer." );
+	else -- If the selection is equal to the first option in the menu, exit.
+		term.setCursorPos(1, 18); -- Exit
+		term.write( "[" .. tMainMenu[Selection].Title .. "]" );
+		
+		term.setCursorPos( 16, 14 ); -- Connect
+		term.write( " " .. tMainMenu[2].Title .. " " );
+		
+		term.setCursorPos( 26, 14 ); -- Host
+		term.write( " " .. tMainMenu[3].Title .. " " );
+		
+		-- Write the description of this option.
+		cPrint( 16, "Exit the prgoram." );
+	end
+end
+
+function DrawConnectMenu() -- Draw the menu that the user can use to connect remotely to another computer.
+	Clear() -- Clear the screen so we may draw new text.
+	DrawLogo(); -- Draw the Mozilla Logo onto the screen.
+	cPrint( 10, string.rep( " ", 50 ) ); -- Clear the 10th line that holds: "Remote Connect by PaymentOption".
+	cPrint( 10, "Connect to: " ); -- Write Connect on the newly cleared line.
+	
+	local ComputerIDToConnectTo = tonumber( read() ); -- Get the ID of the computer th user wishes to connect remotely to.
+	
+	if Connect( ComputerIDToConnectTo ) then -- If we successfully connected to the server.
+		cPrint( 10, string.rep( " ", 50 ) ); -- Clear the 10th line that holds: "Remote Connect by PaymentOption".
+		cPrint( 10, "Successfully connected!" ); -- Write Successfully connected! on the newly cleared line.
+		sleep( 1 );
+		
+		-- Set up the screen.
+		Clear(); -- Clear the screen.
+		print( os.version() .. " -> " .. ServerID ); -- Print the os version and the computer ID we're connected to.
+		--Lines = 1; -- The first line has been printed on the screen.
+		
+		MenuState = "Connected"; -- Set the menu to the connected menu.
+		return true; -- Report a successfull connection.
+	else
+		cPrint( 10, string.rep( " ", 50 ) ); -- Clear the 10th line that holds: "Remote Connect by PaymentOption".
+		cPrint( 10, "Failed to connect" ); -- Write Failed to connect on the newly cleared line.
+		sleep( 1 );
+		
+		return false; -- Report a failed connection.
+	end
+end
+-------------------
+
+-- Commands stuck into functions --
+function EditFile( FileToEdit )
+	if string.sub( CurrentDirectory, 1, 3 ) ~= "rom" then -- If we are not in any part of the ROM directory.
+		if Ping( ServerID ) then -- If we can contact the server.
+			rednet.send( ServerID, "MayWeEdit!SP!" .. CurrentDirectory .. "/" .. FileToEdit ); -- Ask the server if we can edit this file.
+			
+			Sender, Confirmation = rednet.receive( 0.15 ); -- Wait for a quarter of a second for a response from the server.
+			if Sender == ServerID then --If the message received was from the server.
+				if Confirmation == "YouMayEditThat" then -- If the server is allowing us to edit the file requested.
+					if fs.exists( "TempFile_MozillaRemoteConnect" ) then -- If the temporary file used for editing already exists.
+						fs.delete( "TempFile_MozillaRemoteConnect" ); -- Delete the temporary file.
+					end
+					
+					shell.run( "edit", "TempFile_MozillaRemoteConnect" ); -- Allow the user to write a new file.
+					
+					local File = fs.open( "TempFile_MozillaRemoteConnect", "r" ); -- Get a handle on the file we just created.
+					local EditFileContents = File.readAll(); -- Get the file contents.
+					File.close(); -- Close the file handle.
+					
+					if Ping( ServerID ) then -- If we can contact the server.
+						rednet.send( ServerID, "UploadingEditedFile!SP!" .. CurrentDirectory .. "/" .. FileToEdit .. "!SP!" .. EditFileContents ); -- Send the new file contents to the server.
+						fs.delete( "TempFile_MozillaRemoteConnect" )
+					else -- If we cannot contact the server.
+						print( "Upload failure." ); -- Signal an upload failure.
+					end
+				else -- If the server is not allowing us to edit the file requested.
+					if Confirmation == "YouMayNotEditADirectory" then
+						print( "Cannont edit a directory." );
+					elseif Confirmation == "ThatExistsAndYouMayEditIt" then -- If the file requested exists and we may edit it.
+						Sender, EditFileContents = rednet.receive( 0.15 ); -- Wait for a quarter of second for the file contents that we are going to edit.
+						
+						if Sender == ServerID then -- If the message we received was from the server.
+							if fs.exists( "TempFile_MozillaRemoteConnect" ) then -- If the temporary file used for editing already exists.
+								fs.delete( "TempFile_MozillaRemoteConnect" ); -- Delete the temporary file.
+							end
+							
+							local File = fs.open( "TempFile_MozillaRemoteConnect", "w" ); -- Open the file for editing.
+							File.write( EditFileContents ); -- Write the contents received to the file so we may edit it.
+							File.close(); -- Close the file handle.
+							
+							shell.run( "edit", "TempFile_MozillaRemoteConnect" ); -- Let the user make any changes they wish.
+							
+							if fs.exists( "TempFile_MozillaRemoteConnect" ) then -- If the user actually put some data into the file.
+								File = fs.open( "TempFile_MozillaRemoteConnect", "r" ); -- Open the file so we can get the edited file contents.
+								EditFileContents = File.readAll(); -- Get the file contents.
+								File.close(); -- Close the file handle.
+								
+								if Ping( ServerID ) then -- If we can contact the server.
+									rednet.send( ServerID, "UploadingEditedFile!SP!" .. CurrentDirectory .. "/" .. FileToEdit .. "!SP!" .. EditFileContents ); -- Send the new file contents to the server.
+								else -- If we cannot contact the server.
+									print( "Upload failure." ); -- Signal an upload failure.
+								end
+							end
+						end
+					end
+				end
+			end
+		else -- If we cannot contact the server.
+			print( "Cannot ping server." ); -- Inform the user of the ping failure.
+		end
+	else -- If we are in some part of the ROM directory.
+		print( "Cannot edit ROM." );
+	end
+end
+
+function RunProgram( ProgramName, tArguments )
+	if Ping( ServerID ) then -- If we can contact the server.
+		rednet.send( ServerID, "IsThisAFile!SP!" .. CurrentDirectory .. "/" .. ProgramName ); -- Ask the server if this is an executable.
+			
+		Sender, Confirmation = rednet.receive( 0.15 ); -- Wait for a quarter of a second for a response from the server.
+		if Sender == ServerID then -- If the message received is from the server.
+			if Confirmation == "Yes" then -- If the file exists and is not a directory.
+				Sender, Program = rednet.receive( 2 ); -- Wait for a quarter of a second for the program from the server.
+				if Sender == ServerID then -- If the program received is from the server.
+					if not tArguments or #tArguments == 0 then -- If arguments were not passed.
+						ProgramFunction = loadstring( Program ); -- Load the message into an executable function.
+					elseif tArguments and #tArguments > 0 then -- If arguments were passed.
+						if fs.exists( "TempFile_MozillaRemoteConnect" ) then -- If the temp file exists.
+							fs.delete( "TempFile_MozillaRemoteConnect" ); -- Delete the temp file.
+						end
+						
+						local File = fs.open( "TempFile_MozillaRemoteConnect", "w" ); -- Open the file for writing.
+						File.write( Program ); -- Write the program received.
+						File.close(); -- Close the file.
+						
+						shell.run( "TempFile_MozillaRemoteConnect", unpack( tArguments ) ); -- Run the program with the given arguments.
+						fs.delete( "TempFile_MozillaRemoteConnect" ); -- Delete the file now that we're done with it.
+					end
+					if ProgramFunction then -- If the program loaded succesfully.
+						pcall( ProgramFunction ); -- Run the program.
+					else -- If the program did not load successfully.
+						print( "File transfer error." );
+					end
+				else -- If the program received is not from the server.
+					print( "File transfer error." );
+				end
+			else -- If the file does not exist or is a directory.
+				print( "No such program." );
+			end
+		else -- If the message is not received from the server.
+			print( "Communication error." );
+		end
+	end
+end
+-----------------------------------
+
+-- Networking functions --
+function RunConnectedShell()
+	-- If the no lines have been typed.
+	--if Lines == 0 or Lines == 18 then
+		-- Set up the screen.
+		--Clear(); -- Clear the screen.
+		--print( os.version() .. " -> " .. ServerID ); -- Print the os version and the computer ID we're connected to.
+		--term.setCursorPos( 1, 2 ); -- Set the cursor position to get a command from the user.
+		--term.write( CurrentDirectory .. "> " ); -- Draw the input singal.
+		--Lines = 1; -- The first line has been printed on the screen.
+	--end
+	
+	write( CurrentDirectory .. "> " ); -- Draw the input singal.
+	local Command = read( nil, tCommandHistory ); -- Get a command to execute from the user.
+	table.insert( tCommandHistory, Command );
+	--Lines = Lines+1; -- Add a line to the amount of lines typed.
+	
+	HandleCommand( Command ); -- Does all command handling and execution.
+end
+
+function HandleCommand( Command )
+	-- Handle multi argument commands --
+	if string.find( Command, " " ) then -- If a space can be found in the command.
+		-- Get a table of all the arguments.
+		tCommands = split( Command, " " );
+		
+		-- If the command is to edit a file.
+		if tCommands[1] == "edit" then
+			EditFile( tCommands[2] ); -- Edit the file.
+		-- If the command is to change diretories.
+		elseif tCommands[1] == "cd" then
+			
+			if Ping( ServerID ) then -- Contact the server.
+				rednet.send( ServerID, "ListFiles" ); -- Request the list of files in the current directory from the server.
+				-- Receive the files from the server in a string.
+				Sender, Files = rednet.receive( 1.5 );
+				-- Reload the file list.
+				SplitFileList( Files, false );
+			end
+			
+			if tCommands[2] == "/" then
+				if Ping( ServerID ) then -- If we can contact the server.
+					rednet.send( ServerID, "SwitchDirectory!SP!" .. "/" ); -- Request a directory change to the root directory.
+			
+					Sender, Confirmation = rednet.receive( 0.15 ); -- Wait for a quarter of a second for a response from the server.
+					if Sender == ServerID then -- If the message received was from the server.
+						if Confirmation == "Changed" then -- If the server confirmed our directory change request.
+							CurrentDirectory = ""; -- Set the directory to that of our reuqest; the root directory.
+						end
+					end	
+				end
+			elseif tCommands[2] == ".." then -- If the user wants to return down one directory.
+				if Ping( ServerID ) then -- If we can contact the server.
+					rednet.send( Server, "SwitchDirectory!SP!" .. ".." ); -- Return to the previous directory in the list.
+					
+					-- Await a response.
+					Sender, Confirmation = rednet.receive( 0.15 ); -- Only await a confirmation for a quarter of a second.
+					if Sender == ServerID then -- If the server responded
+						if Confirmation == "Changed" then -- If we successfully changed our directory.
+							CurrentDirectory = BackupDirectory( CurrentDirectory );
+						end
+					end
+				end
+			else -- If the user wants to change their directory to a specified directory.
+				if Ping( ServerID ) then -- If we can contact the server.
+					rednet.send( ServerID, "SwitchDirectory!SP!" .. tCommands[2] ); -- Request that we may change our directory.
+					
+					-- Await a response.
+					Sender, Confirmation = rednet.receive( 0.15 ); -- Only await a confirmation for a quarter of a second.
+					if Sender == ServerID then -- If the server responded
+						if Confirmation == "Changed" then -- If we successfully changed our directory.
+							if CurrentDirectory == "" then -- If the current directory is the root.
+								CurrentDirectory = tCommands[2];
+							else
+								CurrentDirectory = CurrentDirectory .. "/" .. tCommands[2];
+							end
+						end
+					end
+				end
+			end
+		-- If the command is to create a directory.
+		elseif tCommands[1] == "mkdir" then
+			if Ping( ServerID ) then -- If we can contact the server.
+				rednet.send( ServerID, "MakeDirectory!SP!" .. tCommands[2] ); -- Request that we create a directory.
+				
+				Sender, Confirmation = rednet.receive( 0.15 ); -- Wait for a response from the server for a quarter of a second.
+				if Sender == ServerID then -- If the message received was from the server.
+					if Confirmation ~= "Created" then -- If the directory was created unsuccessfully.
+						print( "Directory creation failure." );
+					end
+				end
+			else -- If the ping failed.
+				print( "Communication error." );
+			end
+		elseif tCommands[1] == "rm" then
+			if Ping( ServerID ) then -- If we can contact the server.
+				if string.sub( tCommands[2], 1, 3 ) ~= "rom" then -- If we're not trying to delete anything in the ROM.
+					rednet.send( ServerID, "DeleteObject!SP!" .. tCommands[2] ); -- Request to delete an object.
+					
+					Sender, Confirmation = rednet.receive( 0.15 ); -- Wait for a response for a quarter of a second.
+					if Sender == ServerID then -- If the message received was from the server.
+						if Confirmation ~= "Deleted" then -- If we cannot delete the file.
+							print( "Deletion error." );
+						end
+					else -- If the message received was not from the server.
+						print( "Communication error." );
+					end
+				else -- If we're trying to delete something in the ROM.
+					print( "Access Denied: Cannont delete ROM." );
+				end
+			else -- If we cannot ping the server.
+				print( "Communication error." );
+			end
+		-- If the command is for help with an argument.
+		elseif tCommands[1] == "help" then
+			print( "Help not supported over remote access." );
+		-- If the command is to download a file over remote access.
+		elseif tCommands[1] == "download" then
+			local bFileExists = false
+			-- Check if the file name exists.
+			for i=1, #tFileList do
+				if tFileList[i] == tCommands[2] then
+					bFileExists = true
+					break
+				end
+			end
+			
+			if bFileExists and fs.exists( tCommands[3] ) then
+				bFileExists = false
+				print( "File " .. tCommands[3] .. " already exists." )
+				return
+			end
+			
+			-- If the file exists.
+			if bFileExists then
+				-- If we can contact the server.
+				if Ping( ServerID ) then
+					rednet.send( ServerID, "PleaseSendMe!SP!" .. tCommands[2] )
+					
+					-- Wait for a response from the server for 0.2 seconds.
+					Sender, Confirmation = rednet.receive( 1 )
+					-- Check if we got a message from the server.
+					if Sender == ServerID then
+						-- If the server confirmed our download request.
+						if Confirmation == "HereYouGo" then
+							-- Wait to receive the file.
+							Sender, FileContents = rednet.receive( 0.3 )
+							
+							local File = fs.open( tCommands[3], "w" )
+							File.write( FileContents )
+							File.close()
+							
+							print( tCommands[2] .. " successfully downloaded as " .. tCommands[3] .. "." )
+						-- If the server denied our download request.
+						else
+							print( "Failure: denied by server." )
+						end
+					else
+						print( "Failure: couldn't contact host." )
+					end
+				-- If we cannot contact the server.
+				else
+					print( "Failure: couldn't contact host." )
+				end
+			-- If the file doesn't exist.
+			else
+				print( tCommands[2] .. " doesn't exist in the current directory." )
+			end
+		else -- If the command is not registered.
+			-- Setup the arguments given.
+			local tArguments = {}
+			for i=1, #tCommands do
+				if i ~= 1 then
+					tArguments[#tArguments+1] = tCommands[i];
+				end
+			end
+			
+			RunProgram( tCommands[1], tArguments );
+		end
+	else -- If the command is one word.
+		-- If the command is disconnect.
+		if Command == "disconnect" then
+			if Ping( ServerID ) then
+				rednet.send( ServerID, "DisconnectMe" ); -- Inform the server of our departure.
+			end
+		
+			Lines = 0; -- Reset the amount of lines typed in the shell.
+			MenuState = "Main"; -- Set the menu to main.
+			CurrentDirectory = ""; -- Reset the directory of the user.
+			Connected = false; -- Disconnect from the server.
+		-- If the command is list.
+		elseif Command == "ls" or Command == "list" then
+			if Ping( ServerID ) then -- Contact the server.
+				rednet.send( ServerID, "ListFiles" ); -- Request the list of files in the current directory from the server.
+				-- Receive the files from the server in a string.
+				Sender, Files = rednet.receive( 1.5 );
+				-- Print the file list.
+				SplitFileList( Files, true );
+			end
+		-- If the command is to grab the computer ID.
+		elseif Command == "id" then
+			print( "This computer is #" .. ServerID )
+		-- If the command is to clear the screen.
+		elseif Command == "clear" then
+			Clear();
+			print( os.version() .. " -> " .. ServerID );
+		-- If the command is cd with no parameters.
+		elseif Command == "cd" then
+			print( "Usage: cd <path>" );
+		-- If the command is edit with no parameters.
+		elseif Command == "edit" then
+			print( "Usage: edit <path>" );
+		-- If the command is help.
+		elseif Command == "help" then
+			print( "Help not supported over remote access." );
+		else
+			-- Attempt to run the program from the server.
+			RunProgram( Command );
+		end
+	end
+end
+
+function OpenExistantModem() -- Opens a modem, if there is one.
+	tSides = { "right", "left", "top", "bottom", "front", "back" }
+	
+	for i=1, #tSides do
+		if peripheral.isPresent( tSides[i] ) and peripheral.getType( tSides[i] ) == "modem" then
+			rednet.open( tSides[i] );
+			return true
+		end
+	end
+	
+	return false;
+end
+
+function Ping( id )
+	rednet.send( id, "pingingYouFromServer" )
+	local sender, message = rednet.receive( 0.15 )
+	if sender == id and message == "respondingToPingFromYou" then return true
+	else return false end
+end
+
+function Connect( ID ) -- Attempts to onnect to the requested computer.
+	if Ping( ID ) then -- If we can successfully contact the server.
+		rednet.send( ID, "MayWeConnect?" ); -- Ask the server if we can connect to it; we are assuming that it is running the modified shell.
+		--Sender, Confirmation = rednet.receive( 0.5 ); -- Only await connection confirmation for 1 second.
+		sender, message = rednet.receive(10);
+		--if sender then return true end
+		
+		if sender == ID then -- If we received a message from the ID we contacted. This is used to filter unwanted broadcasts.
+			if message == "YouMayConnect" then -- If the server told us we may connect to it.
+				ServerID = ID; -- Set the connected server ID to that of the server we just connected to.
+				Connected = true; -- Set the state of our connection to true, meaning that we can now use remote control functions.
+				
+				return true; -- Report a successfull connection to the requested server.
+			else -- If the server did not tell us that we can connect to it.
+				return false; -- Report a failed attempt to connect due to the server denying our request to connect.f
+			end
+		else -- If the sender of the message received was not that of the ID we contacted.
+			return false; -- Report a failed attempt to connect due to our connection being jammed by unwanted messages.
+		end
+	else -- If the we cannot contact the server.
+		return false; -- Report a failure to connect to the calling function.
+	end
+end
+
+function Host() -- Hosts a remote computer for other remote connect users to connect to.
+	shell.run( "MozillaRemoteHost" ); -- Execute the hosting program.
+end
+--------------------------
+
+-- Main function --
+function MainProgramLoop() -- Begins the main program loop.
+	if MenuState == "Main" then -- If we are in the main menu.
+		-- Draw the main menu.
+		DrawLogo();
+		DrawMainMenu();
+		
+		-- Hanlde the cursor movement via key presses.
+		Event, Key = os.pullEvent( "key" ); -- Await a key event.
+		
+		-- If the user pressed the right key.
+		if Key == 205 and Selection < #tMainMenu then
+			Selection = Selection+1; -- Move the selection over to the next option.
+		-- If the user pressed the left key.
+		elseif Key == 203 and Selection > 1 then
+			Selection = Selection-1; -- Move the selection back to the previous option.
+		-- If the user pressed the enter key.
+		elseif Key == 28 then
+			-- If the selection is on connect.
+			if Selection == 2 then
+				DrawConnectMenu(); -- Draw the connection menu.
+			-- If the selection is on host.
+			elseif Selection == 3 then
+				Host(); -- Being the hosting program.
+			-- If the selection is on exit.
+			else
+				-- Reset the screen to look as if the PC just booted up.
+				Clear(); -- Clear the screen.
+				print( os.version() ); -- Print the OS version.
+				bRunning = false; -- Disable the main loop.
+			end
+		end
+	elseif MenuState == "Connected" then -- If we are at the connect screen. (Enter an ID to connect to a PC.)
+		-- Run the mozilla modified shell that allows you to execute commands on another computer.
+		RunConnectedShell();
+	end
+end
+-------------------
+
+if not OpenExistantModem() then -- Open any modem we find. If we cannot find one then throw an error.
+	error( "No modem found." );
+end
+
+local NewVersion, bShouldUpdate = checkForUpdate();
+if bShouldUpdate then
+	update( NewVersion );
+	shell.run( "MozillaRemoteHost" );
+end
+
+while bRunning do -- While the program is running.
+	if MenuState ~= "Connected" then -- If we are not connected to any computer.
+		Clear(); -- Clear the screen for updating.
+	end
+	MainProgramLoop(); -- Execute the main program function.
+end

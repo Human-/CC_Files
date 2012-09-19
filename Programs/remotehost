@@ -1,0 +1,499 @@
+-- Variables --
+tConnections = {}; -- Holds all of the currently connected computers. Format: { ID, Directory, UploadTicket };
+MaximumConnections = 12; -- The maximum amount of connections that are allowed on this computer.
+
+tMainMenu = { [1] = { Title = "Begin Hosting" }, [2] = { Title = "Edit Whitelist" }, [3] = { Title = "Exit" } };
+Selection = 1;
+MenuState = "Main";
+
+tWhiteList = {}; -- The list of computer ID's that are allowed to access this computer.
+
+bRunning = true; -- Whether or no the program is running.
+ScreenWidth, ScreenHeight = term.getSize(); -- Screen dimensions.
+
+VERSION = 1.3;
+---------------
+
+-- Positioning Functions --
+
+-- Prints to the center of the screen.
+-- Parameterts: height you wish to print on, the string you wish to print.
+function cPrint(height, string)
+	-- Set the position of the cursor to the center of the screen.
+	term.setCursorPos( ScreenWidth/2 - string.len( string )/2, height );
+	-- Write the string to the center of the screen.
+	term.write( string );
+end
+
+-- Prints to the right of the screen.
+-- Parameterts: height you wish to print on, the string you wish to print.
+function rPrint(height, string)
+	-- Set the position of the cursor to the right of the screen far enough left that our text ends at the right border.
+	term.setCursorPos( ScreenWidth - string.len( string ), height );
+	-- Write the string to the center of the screen.
+	term.write( string );
+end
+
+function Clear() -- Clears the screen.
+	term.clear();
+	term.setCursorPos( 1, 1 );
+end
+
+-- Checks if the given id is already connected to this computer.
+-- Parameters: The id of the computer to check if it is connected.
+function CheckIfConnectionExists( ID )
+	for i=1, #tConnections do -- Iterate through all connections in the tConnections table.
+		if tConnections[i].ID == ID then -- If the connection already exists.
+			return true; -- Return true as to inform the calling function that the connection does in fact exist.
+		end
+	end
+	
+	return false; -- If the function has not returned true, meaning that this connction does not exist then return false.
+end
+
+-- Code taken directly from: http://lua-users.org/wiki/SplitJoin
+-- Compatibility: Lua-5.1
+function split(str, pat)
+   local t = {}  -- NOTE: use {n = 0} in Lua-5.0
+   local fpat = "(.-)" .. pat
+   local last_end = 1
+   local s, e, cap = str:find(fpat, 1)
+   while s do
+      if s ~= 1 or cap ~= "" then
+	 table.insert(t,cap)
+      end
+      last_end = e+1
+      s, e, cap = str:find(fpat, last_end)
+   end
+   if last_end <= #str then
+      cap = str:sub(last_end)
+      table.insert(t, cap)
+   end
+   return t
+end
+
+function GetUserIndex( ID ) -- Gets the index of the id within the connections table.
+	for i=1, #tConnections do
+		if ID == tConnections[i].ID then
+			return i;
+		end
+	end
+	
+	return nil;
+end
+---------------------------
+
+-- Update functions --
+function update( nNewVer )
+	local sCode = "f7pUMa8u"
+	
+	file = fs.open(".serverVersion", "w")
+	file.write(nNewVer)
+	file.close()
+	
+	Clear();
+	DrawLogo();
+	cPrint( 11, "Updating..." );
+		
+	while true do
+		local response = http.get(
+			"http://pastebin.com/raw.php?i="..textutils.urlEncode( sCode )
+			)
+				
+		if response then
+			local sResponse = response.readAll()
+			response.close()
+				
+			file = fs.open("/MozillaRemoteHost", "w")
+			file.write(sResponse)
+			file.close()
+			return
+		else return end
+	end
+end
+
+function checkForUpdate()
+	local sCode = "yRg5BfBt"
+		
+	Clear();
+	DrawLogo();
+	cPrint( 11, "Checking version..." );
+		
+	while true do
+		local response = http.get(
+			"http://pastebin.com/raw.php?i="..textutils.urlEncode( sCode )
+			)
+				
+		if response then
+			local sResponse = response.readAll()
+			response.close()
+				
+			if VERSION < tonumber(sResponse) then return tonumber(sResponse), true
+			else return false end
+		else return false end
+	end
+end
+----------------------
+
+-- Gui functions --
+function DrawLogo() -- Draws the Mozilla logo to the screen.
+	rPrint( 13, "    __  ___            _ ____     " );
+	rPrint( 14, "   /  |/  /___  ____  (_) / /___ _" );
+	rPrint( 15, "  / /|_/ / __ \\/_  / / / / / __ '/" );
+	rPrint( 16, " / /  / / /_/ / / /_/ / / / /_/ / " );
+	rPrint( 17, "/_/  /_/\\____/ /___/_/_/_/\\__,_/  " );
+	rPrint( 18, "Remote Host by PaymentOption" );
+end
+
+function ClearConnectionInfo() -- Clear the section of the screen that houses all of the connection information.
+	for i=1, 12 do -- Iterate over the 12 lines of connection information.
+		term.setCursorPos( 1, i );
+		term.write( string.rep( " ", 50 ) ); -- Clear the current line.
+	end
+end
+
+-- Draws the current connections to this computer and their directories.
+function DrawConnections()
+	ClearConnectionInfo(); -- Clear the area where we'll be drawing the connection info.
+
+	if #tConnections > 0 then -- If there is at least one current connection to this computer.
+		for i=1, #tConnections do -- Iterate through all of the current connections.
+			term.setCursorPos( 1, i ); -- Set the cursor to the next line at x position 1.
+			term.write( "ID " .. i .. ": " .. tConnections[i].ID .. " | " .. "Dir: " .. tConnections[i].Directory); -- Write the id of the the connection with the indedx of the iterator and the directory.
+		end
+	else -- If there are no current connections.
+		term.setCursorPos( 1, 1 );
+		term.write( "No connections." );
+	end
+end
+
+function DrawConnectionScreen() -- Draws the connection screen and all of its componenents.
+	DrawLogo(); -- Draw the logo in the bottom right hand side of the screen.
+	DrawConnections(); -- Draw the connection information.
+end
+
+function DrawMainMenu() -- Draws the main menu.
+	local function DrawLogoMain() -- Draws the Mozilla logo to the screen; localized to the main menu so it appears on the top of the screen.
+		cPrint( 1, "    __  ___            _ ____     " );
+		cPrint( 2, "   /  |/  /___  ____  (_) / /___ _" );
+		cPrint( 3, "  / /|_/ / __ \\/_  / / / / / __ '/" );
+		cPrint( 4, " / /  / / /_/ / / /_/ / / / /_/ / " );
+		cPrint( 5, "/_/  /_/\\____/ /___/_/_/_/\\__,_/  " );
+		cPrint( 6, "Remote Host by PaymentOption" );
+	end
+	DrawLogoMain(); -- Draws the localized main menu logo.
+	
+	for i=1, #tMainMenu do -- Iterate through the main menu.
+		if Selection == i then -- If the selection matches the iterator.
+			-- Draw the selection with brackets to signal that it is selected.
+			cPrint( i + 8, "[" .. tMainMenu[i].Title .. "]" );
+		else -- If the current item in the main menu is not selected.
+			-- Draw the selection without brackets to signal that it is not selected.
+			cPrint( i + 8, " " .. tMainMenu[i].Title .. " " );
+		end
+	end
+	
+	-- Write the descriptions of the options.
+	if Selection == 1 then -- Begin Hosting.
+		cPrint( 16, "Allow this computer to be" );
+		cPrint( 17, "remotely connected to." );
+	elseif Selection == 2 then -- Edit the whitelist.
+		cPrint( 16, "Edit the list of computer ID's that" );
+		cPrint( 17, "may connect to remotely to this PC." );
+	elseif Selection == 3 then -- Exit.
+		cPrint( 16, "Exit the program." );
+	end
+	
+	rPrint( ScreenHeight, "Version: " .. VERSION )
+end
+-------------------
+
+-- File functions --
+function GetFileLength( FileName )
+	if fs.exists( FileName ) then -- If the file passed exists.
+		File = io.open( FileName, "r" ); -- Get a handle on the file.
+		local Lines = 0; -- The total number of lines in the file.
+		
+		-- Iterate through the whole file.
+		for i in File:lines() do
+			Lines = Lines+1; -- Add 1 to the total amount of lines every iteration.
+		end
+		File:close(); -- Close the file handle.
+		
+		return Lines; -- Return the total amount of lines in the file passed.
+	else -- If the file does not exist.
+		return nil; -- Return nil to the calling function.
+	end
+end
+
+function LoadWhiteList()
+	if fs.exists( "MozillaWhiteList" ) then -- If the whitelist file exists.
+		local WhiteListLength = GetFileLength( "MozillaWhiteList" ); -- Get the length of the whitelist.
+		local File = fs.open( "MozillaWhiteList", "r" ); -- Get a handle on the whitelist file.
+		
+		-- Iterate through the file to get its contets.
+		for i=1, WhiteListLength do
+			tWhiteList[#tWhiteList+1] = tonumber( File.readLine() ); -- Add the current ID on the line to the whitelist and cast to number since file.readLine() returns a string.
+		end
+		File.close(); -- Close the file handle.
+		
+		return; -- Skip the extra logic below.
+	else -- If the whitelist file does not exist.
+		return; -- Assume that we allow all computers to connect.
+	end
+end
+
+function CheckAgainstWhiteList( ID )
+	if #tWhiteList > 0 then -- If the whitelist exists.
+		for i=1, #tWhiteList do -- Iterate through the whitelist table.
+			if ID == tWhiteList[i] then -- If the ID matches an ID in the whitelist.
+				return true; -- Report that the ID is whitelisted.
+			end
+		end
+		
+		-- If the ID did not match any value in the whitelist then report that is not whitelisted.
+		return false;
+	else -- If there is no whitelist.
+		return true; -- Report that this ID is accepted because there is no whitelist.
+	end
+end
+
+function BackupDirectory( Directory ) -- Seperates the directory given into one less level.
+	local tDirLevels = split( Directory, "/" ); -- Seperate each level of directories into a table.
+	table.remove( tDirLevels, #tDirLevels ); -- Remove the last directory.
+	
+	local NewDir = ""; -- Holds the new shortened directory.
+	for i,v in pairs( tDirLevels ) do
+		NewDir = NewDir .. "/" .. v;
+	end
+	
+	return string.sub( NewDir, 2, string.len( NewDir ) );
+end
+--------------------
+
+-- Networking functions --
+function OpenExistantModem() -- Opens a modem, if there is one.
+	tSides = { "right", "left", "top", "bottom", "front", "back" }
+	
+	for i=1, #tSides do
+		if peripheral.isPresent( tSides[i] ) and peripheral.getType( tSides[i] ) == "modem" then
+			rednet.open( tSides[i] );
+			return true
+		end
+	end
+	
+	return false;
+end
+
+function RespondToPings() -- Responds to any ping from any computer.
+	sender, ping = rednet.receive()
+	if ping == "pingingYouFromServer" then rednet.send( sender, "respondingToPingFromYou" ); return sender, true
+	else return false end
+end
+
+function ConnectUser( ComputerID ) -- Connects the current user to the computer to allow usage of this computer remotely.
+	if #tConnections < MaximumConnections then -- If the connection limit has not been reached.
+		tConnections[#tConnections+1] = { ID = ComputerID, Directory = "/", UploadTicket = false }; -- Add the user to the connections table.
+		return true; -- Report a successfull addition.
+	else -- If the connection limit has been reached.
+		return false; -- Report an unsuccessfull addition.
+	end
+end
+
+function DisconnectUser( ID )
+	for i=1, #tConnections do -- Iterate through all of the connected users.
+		if ID == tConnections[i].ID then -- Find the ID of the connected user who wishes to disconnect.
+			-- Disconnect the user by removing their record from the table.
+			table.remove( tConnections, i );
+		end
+	end
+end
+
+function HandleCommands()
+	Sender, Command = rednet.receive( 0.15 ); -- Await a command only for 0.15 seconds after the ping is successfull.
+	
+	if not CheckIfConnectionExists( Sender ) and CheckAgainstWhiteList( Sender ) then -- If the sender is not already connected to this computer.
+		if Command == "MayWeConnect?" then -- If the sender wants to connect.
+			if ConnectUser( Sender ) then -- If the user successfully connected.
+				rednet.send( Sender, "YouMayConnect" ); -- Inform the computer that requested to connect that they may connect.
+			else -- If the user connected unsuccessfully.
+				rednet.send( Sender, "YouMayNotConnect" ); -- Inform the computer that requested to connect that they may not connect.
+			end
+		end
+	else -- If the sender is currently connected.
+		if string.find( Command, "!SP!" ) then -- If the command has arguments; a separtation character was found.
+			tCommands = split( Command, "!SP!" );
+			
+			-- If the command is to upload and the sender is queued to upload a file.
+			if tCommands[1] == "UploadingEditedFile" and tConnections[GetUserIndex( Sender )].UploadTicket then
+				local File = fs.open( tCommands[2], "w" ); -- Open the file for editing.
+				File.write( tCommands[3] ); -- Write the received contents to the file opened.
+				File.close(); -- Close the file handle.
+			-- If the user wants to edit a file.
+			elseif tCommands[1] == "MayWeEdit" then
+				if not fs.exists( tCommands[2] ) then -- If the file does not exist.
+					rednet.send( Sender, "YouMayEditThat" ); -- Inform the sender that they may create the file selected.
+					tConnections[GetUserIndex( Sender )].UploadTicket = true; -- Open up an upload ticket for the user.
+			
+					-- When the sender now sends the command "UploadingFile" then we'll add the new file.
+				else -- If the file does exist.
+					if fs.isDir( tCommands[2] ) then -- If the user wants to edit a directory.
+						rednet.send( Sedner, "YouMayNotEditADirectory" );
+					else -- If the file is not a directory and it exists.
+						rednet.send( Sender, "ThatExistsAndYouMayEditIt" );
+						tConnections[GetUserIndex( Sender )].UploadTicket = true; -- Open up an upload ticket fro the user.
+				
+						-- Get the file contents and send it to the user so they may edit it.
+						local File = fs.open( tCommands[2], "r" ); -- Get a handle on the file.
+						local FileContents = File.readAll(); -- Get the contents of the file we wish to send to the user.
+						File.close(); -- Close the file handle.
+				
+						rednet.send( Sender, FileContents ); -- Send the file contents to the sender who requested it.
+					end
+				end
+			-- If the user wants to swithc their directory.
+			elseif tCommands[1] == "SwitchDirectory" and tCommands[2] == "/" then
+				rednet.send( Sender, "Changed" ); -- Inform the user of their directory change.
+				tConnections[GetUserIndex( Sender )].Directory = "/"; -- Set the directory in our connections table.
+			elseif tCommands[1] == "SwitchDirectory" and tCommands[2] == ".." then
+				if fs.isDir( BackupDirectory( tConnections[GetUserIndex( Sender )].Directory ) ) then -- If the previous directory exists.
+					tConnections[GetUserIndex( Sender )].Directory = BackupDirectory( tConnections[GetUserIndex( Sender )].Directory );
+					rednet.send( Sender, "Changed" );
+				end
+			elseif tCommands[1] == "SwitchDirectory" then
+				if fs.isDir( tConnections[GetUserIndex( Sender )].Directory .. "/" .. tCommands[2] ) then -- If the requested directory exists.
+					if tConnections[GetUserIndex( Sender )].Directory == "/" then -- If the user is in the root directory.
+						tConnections[GetUserIndex( Sender )].Directory = tCommands[2]; -- Set the directory without the slash.
+					else -- If the user is not in the root directory.
+						tConnections[GetUserIndex( Sender )].Directory = tConnections[GetUserIndex( Sender )].Directory .. "/" .. tCommands[2];
+					end
+					
+					rednet.send( Sender, "Changed" ); -- Inform the user of their directory change.
+				else
+					rednet.send( Sender, "NotChanged" ); -- Inform the user of their directory change failure.
+				end
+			-- If the command is to create a directory.
+			elseif tCommands[1] == "MakeDirectory" then
+				if not fs.exists( tCommands[2] ) then -- If the directory requested to make does not exist.
+					fs.makeDir( tCommands[2] ); -- Create the directory.
+					rednet.send( Sender, "Created" ); -- Inform the sender that the directory was made.
+				end
+			-- If the command is to delete an object.
+			elseif tCommands[1] == "DeleteObject" then
+				if fs.exists( tCommands[2] ) then -- If the file or directory exists.
+					fs.delete( tCommands[2] );
+					rednet.send( Sender, "Deleted" );
+				end
+			-- If the command is a program name.
+			elseif tCommands[1] == "IsThisAFile" then
+				if fs.exists( tCommands[2] ) and not fs.isDir( tCommands[2] ) then -- If the program exists and is not a directory.
+					rednet.send( Sender, "Yes" );
+					
+					local File = fs.open( tCommands[2], "r" ); -- Get a handle on the program to send to the user.
+					local ProgramToTransfer = File.readAll(); -- Get the contents of the file.
+					File.close(); -- Close the file.
+					
+					rednet.send( Sender, ProgramToTransfer );
+				else -- If the program does not exist or is a directory.
+					rednet.send( Sender, "No" );
+				end
+			-- If the command is to download a file.
+			elseif tCommands[1] == "PleaseSendMe" then
+				-- If the file the user requested exists.
+				if fs.exists( tConnections[GetUserIndex( Sender )].Directory .. "/" .. tCommands[2] ) then
+					rednet.send( Sender, "HereYouGo" )
+					
+					local File = fs.open( tConnections[GetUserIndex( Sender )].Directory .. "/" .. tCommands[2], "r" )
+					local FileContents = File.readAll()
+					File.close()
+					
+					rednet.send( Sender, FileContents )
+				-- If the file the user requested doesn't exist.
+				else
+					rednet.send( Sender, "YouCan'tHaveThat" )
+				end
+			end
+		else -- If the command is one word, or a program call with no arguments.
+			if Command == "DisconnectMe" then -- If the sender wishes to disconnect then.
+				DisconnectUser( tonumber( Sender ) ); -- Disconnect the user.
+			-- If the command is list files.
+			elseif Command == "ListFiles" then
+				-- Get the files from the user's directory.
+				local ID = GetUserIndex( Sender );
+				local tFiles = fs.list( tConnections[ID].Directory );
+				
+				-- Response format: ObjectName!SP!Type. Type is either F or D. --
+				local Response = "";
+				-- Fill the string with the table.
+				for i=1, #tFiles do
+					Response = Response .. tFiles[i] .. "!SP!";
+					if fs.isDir( tFiles[i] ) then -- If the object is a directory.
+						Response = Response .. "D" .. "!SP!"; -- Add the directory tag to this object.
+					else -- If the object is a file.
+						Response = Response .. "F" .. "!SP!"; -- Add the file tag to this object.
+					end
+				end
+				-- Communicate the response string that holds all of the files to the computer who requested them.
+				rednet.send( Sender, Response );
+			end
+		end
+	end
+end
+--------------------------
+
+-- Main Loop and other logic --
+function MainProgramLoop() -- Basically, this is the whole program in one function.
+	if MenuState == "Main" then -- If the current menu is main.
+		DrawMainMenu(); -- Draw the main menu so the user can interact with it.
+		
+		-- Handle key presses and menu movement.
+		Event, Key = os.pullEvent( "key" ); -- Filter all events except for key presses.
+		
+		if Key == 200 and Selection > 1 then -- If the up key is pressed and the selection is greater than 1.
+			Selection = Selection - 1; -- Move the selection up 1 option on the menu.
+		elseif Key == 208 and Selection < #tMainMenu then -- If the down key is pressed and the selection is less than the size of the main menu.
+			Selection = Selection + 1; -- Move the selection down 1 option on the menu.
+		elseif Key == 28 then -- If the enter key is pressed.
+			if Selection == 1 then -- If the current selection is "Begin Hosting".
+				MenuState = "Host"; -- Set the menu to the hosting menu.
+			elseif Selection == 2 then -- If the current selection is "Edit Whitelist".
+				MenuState = "Whitelist"; -- Set the menu to the whitelist editor.
+			elseif Selection == 3 then -- If the current selection is "Exit".
+				-- Reset the screen to make it appear as if it just started up.
+				Clear(); -- Clear the screen.
+				print( os.version() ); -- Print the OS version.
+				bRunning = false; -- Close the program.
+			end
+		end
+	elseif MenuState == "Whitelist" then -- If the current menu is the whitelist editor.
+		shell.run( "edit", "MozillaWhiteList" ); -- Allow the user to edit the whitelist and return back to the program.
+		MenuState = "Main"; -- Return to the main menu once the user is done editing the whitelist.
+	elseif MenuState == "Host" then -- If the user is hosting their computer as a remotely connectable PC.
+		-- Draw the connection screen.
+		DrawConnectionScreen();
+		
+		Sender, Pinged = RespondToPings(); -- Check if any computer's are attempting to ping this computer.
+		if Pinged then -- If a computer pinged this computer.
+			-- Handle all commands thus received by this user.
+			HandleCommands();
+		end
+	end
+end
+-------------------------------
+
+if not OpenExistantModem() then -- Open any modem we find. If we cannot find one then throw an error.
+	error( "No modem found." );
+end
+
+LoadWhiteList();
+
+--[[local NewVersion, bShouldUpdate = checkForUpdate();
+if bShouldUpdate then
+	update( NewVersion );
+	shell.run( "MozillaRemoteConnect" );
+end--]]
+
+while bRunning do
+	Clear();
+	MainProgramLoop();
+end
